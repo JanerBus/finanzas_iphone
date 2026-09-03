@@ -6,7 +6,7 @@ struct CreateTransactionView: View {
     @Environment(\.dismiss) private var dismiss
     
     @Query(filter: #Predicate<Account> { $0.isActive }, sort: \Account.name) private var accounts: [Account]
-    @Query(sort: \Category.name) private var categories: [Category] // Fase 9: Categorías
+    @Query(sort: \Category.name) private var categories: [Category]
     
     @State private var transactionType: TransactionType = .expense
     @State private var amountString: String = ""
@@ -18,6 +18,15 @@ struct CreateTransactionView: View {
     @State private var selectedCategory: Category?
     
     @State private var errorMessage: String?
+    
+    // Validación Fase 12
+    var isFormValid: Bool {
+        if transactionType == .transfer {
+            return !amountString.trimmingCharacters(in: .whitespaces).isEmpty && selectedAccount != nil && destinationAccount != nil && selectedAccount != destinationAccount
+        } else {
+            return !amountString.trimmingCharacters(in: .whitespaces).isEmpty && !desc.trimmingCharacters(in: .whitespaces).isEmpty && selectedAccount != nil
+        }
+    }
     
     var body: some View {
         Form {
@@ -38,7 +47,6 @@ struct CreateTransactionView: View {
                 
                 DatePicker("Fecha", selection: $date, displayedComponents: [.date, .hourAndMinute])
                 
-                // Las categorías solo aplican a ingresos o gastos
                 if transactionType != .transfer {
                     Picker("Categoría", selection: $selectedCategory) {
                         Text("Ninguna").tag(nil as Category?)
@@ -51,8 +59,8 @@ struct CreateTransactionView: View {
             
             Section(header: Text(transactionType == .transfer ? "Cuenta Origen" : "Cuenta")) {
                 if accounts.isEmpty {
-                    Text("Debes crear al menos una cuenta en 'Mis Cuentas' primero.")
-                        .foregroundColor(.red)
+                    Text("Debes crear al menos una cuenta primero.")
+                        .foregroundColor(AppTheme.errorColor)
                         .font(.footnote)
                 } else {
                     Picker("Seleccione", selection: $selectedAccount) {
@@ -90,7 +98,7 @@ struct CreateTransactionView: View {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button("Guardar") { saveTransaction() }
                     .fontWeight(.bold)
-                    .disabled(accounts.isEmpty)
+                    .disabled(!isFormValid || accounts.isEmpty)
             }
         }
         .onAppear {
@@ -103,7 +111,7 @@ struct CreateTransactionView: View {
         let amount = Double(amountString.replacingOccurrences(of: ",", with: ".")) ?? 0.0
         
         guard let account = selectedAccount else {
-            errorMessage = "Debes seleccionar una cuenta válida."
+            errorMessage = "Debes seleccionar una cuenta."
             return
         }
         
@@ -115,7 +123,7 @@ struct CreateTransactionView: View {
                 try service.recordIncome(amount: amount, currency: account.currency, date: date, desc: desc, category: selectedCategory, account: account)
             case .transfer:
                 guard let destAccount = destinationAccount else {
-                    errorMessage = "Debes seleccionar una cuenta destino."
+                    errorMessage = "Falta cuenta destino."
                     return
                 }
                 try service.recordTransfer(amount: amount, currency: account.currency, date: date, desc: desc, fromAccount: account, toAccount: destAccount)

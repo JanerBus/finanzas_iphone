@@ -1,41 +1,40 @@
 import SwiftUI
+import SwiftData
 
 struct CreateAccountView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     
     @State private var name: String = ""
-    @State private var selectedType: AccountType = .bank
+    @State private var type: AccountType = .bank
     @State private var currency: String = "COP"
     @State private var initialBalanceString: String = ""
-    @State private var notes: String = ""
+    @State private var errorMessage: String?
     
-    @State private var errorMessage: String? = nil
+    // Validación de Fase 12
+    var isFormValid: Bool {
+        !name.trimmingCharacters(in: .whitespaces).isEmpty &&
+        !initialBalanceString.trimmingCharacters(in: .whitespaces).isEmpty
+    }
     
     var body: some View {
         Form {
-            Section(header: Text("Detalles Principales")) {
-                TextField("Nombre (ej. Efectivo, Nequi)", text: $name)
+            Section(header: Text("Detalles de la Cuenta")) {
+                TextField("Nombre (Ej. Bancolombia)", text: $name)
                 
-                Picker("Tipo de cuenta", selection: $selectedType) {
-                    Text("Efectivo").tag(AccountType.cash)
+                Picker("Tipo", selection: $type) {
                     Text("Banco").tag(AccountType.bank)
-                    Text("Billetera Digital").tag(AccountType.digitalWallet)
-                    Text("Ahorros").tag(AccountType.savings)
+                    Text("Efectivo").tag(AccountType.cash)
+                    Text("Billetera Digital").tag(AccountType.wallet)
+                    Text("Inversión").tag(AccountType.investment)
                     Text("Otro").tag(AccountType.other)
                 }
                 
-                TextField("Moneda (ej. COP, USD)", text: $currency)
+                TextField("Moneda (Ej. COP, USD)", text: $currency)
                     .autocapitalization(.allCharacters)
-            }
-            
-            Section(header: Text("Balance Inicial"), footer: Text("Monto real que ya posees en esta cuenta actualmente.")) {
-                TextField("Monto", text: $initialBalanceString)
+                
+                TextField("Saldo Inicial", text: $initialBalanceString)
                     .keyboardType(.decimalPad)
-            }
-            
-            Section(header: Text("Opcional")) {
-                TextField("Notas", text: $notes)
             }
             
             if let error = errorMessage {
@@ -52,7 +51,8 @@ struct CreateAccountView: View {
             }
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button("Guardar") { saveAccount() }
-                .fontWeight(.bold)
+                    .fontWeight(.bold)
+                    .disabled(!isFormValid)
             }
         }
     }
@@ -62,13 +62,7 @@ struct CreateAccountView: View {
         let balance = Double(initialBalanceString.replacingOccurrences(of: ",", with: ".")) ?? 0.0
         
         do {
-            try service.createAccount(
-                name: name,
-                type: selectedType,
-                currency: currency,
-                initialBalance: balance,
-                notes: notes.isEmpty ? nil : notes
-            )
+            try service.createAccount(name: name, type: type, currency: currency, initialBalance: balance)
             dismiss()
         } catch {
             errorMessage = error.localizedDescription

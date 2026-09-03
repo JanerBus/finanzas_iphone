@@ -6,103 +6,122 @@ struct CreateDebtView: View {
     @Environment(\.dismiss) private var dismiss
     
     @Query(sort: \Person.name) private var persons: [Person]
-    @Query(filter: #Predicate<Account> { $0.isActive }, sort: \Account.name) private var accounts: [Account]
+    @Query(filter: #Predicate<Account> { $0.isActive }) private var accounts: [Account]
     
-    @State private var type: DebtDirection = .receivable
-    @State private var amountString: String = ""
-    @State private var desc: String = ""
-    @State private var date: Date = Date()
-    
+    @State private var isReceivable = true 
+    @State private var amountString = ""
     @State private var selectedPerson: Person?
     @State private var selectedAccount: Account?
     
-    @State private var showingCreatePerson = false
+    @State private var showNewPersonForm = false
     @State private var newPersonName = ""
+    @State private var newPersonPhone = ""
     
     @State private var errorMessage: String?
     
+    var isFormValid: Bool {
+        if showNewPersonForm {
+            return !newPersonName.trimmingCharacters(in: .whitespaces).isEmpty && !amountString.isEmpty && selectedAccount != nil
+        } else {
+            return selectedPerson != nil && !amountString.isEmpty && selectedAccount != nil
+        }
+    }
+    
     var body: some View {
         Form {
-            Section(header: Text("Tipo de Operación")) {
-                Picker("Tipo", selection: $type) {
-                    Text("Prestar dinero (Me deben)").tag(DebtDirection.receivable)
-                    Text("Recibir préstamo (Yo debo)").tag(DebtDirection.payable)
+            Section(header: Text("Tipo de Deuda")) {
+                Picker("Tipo", selection: $isReceivable) {
+                    Text("Prestar dinero (Me deben)").tag(true)
+                    Text("Pedir prestado (Yo debo)").tag(false)
                 }
-                .pickerStyle(.menu)
+                .pickerStyle(.segmented)
             }
             
-            Section(header: Text("Persona"), footer: Text("¿A quién le prestas o quién te presta?")) {
-                HStack {
-                    Picker("Seleccionar", selection: $selectedPerson) {
-                        Text("Ninguna").tag(nil as Person?)
-                        ForEach(persons) { person in
-                            Text(person.name).tag(person as Person?)
+            Section(header: Text("Contacto")) {
+                if !showNewPersonForm {
+                    if persons.isEmpty {
+                        Text("No tienes contactos. Crea uno nuevo.")
+                            .foregroundColor(.secondary)
+                            .onAppear { showNewPersonForm = true }
+                    } else {
+                        Picker("Persona", selection: $selectedPerson) {
+                            Text("Seleccione").tag(nil as Person?)
+                            ForEach(persons) { person in
+                                Text(person.name).tag(person as Person?)
+                            }
                         }
                     }
-                    Button(action: { showingCreatePerson = true }) {
-                        Image(systemName: "person.badge.plus")
+                    
+                    Button(action: { showNewPersonForm = true }) {
+                        Label("Crear Nuevo Contacto", systemImage: "person.badge.plus")
+                    }
+                } else {
+                    TextField("Nombre del Contacto", text: $newPersonName)
+                    TextField("Teléfono (Opcional)", text: $newPersonPhone)
+                        .keyboardType(.phonePad)
+                    
+                    if !persons.isEmpty {
+                        Button("Elegir existente") { showNewPersonForm = false }
+                            .foregroundColor(.blue)
                     }
                 }
             }
             
-            Section(header: Text("Detalles Financieros")) {
+            Section(header: Text("Detalles del Préstamo")) {
                 TextField("Monto", text: $amountString)
                     .keyboardType(.decimalPad)
                 
-                Picker("Cuenta afectada", selection: $selectedAccount) {
+                Picker(isReceivable ? "De dónde sale el dinero" : "A dónde entra el dinero", selection: $selectedAccount) {
                     Text("Seleccione").tag(nil as Account?)
                     ForEach(accounts) { account in
                         Text(account.name).tag(account as Account?)
                     }
                 }
-                
-                TextField("Descripción breve", text: $desc)
-                DatePicker("Fecha", selection: $date, displayedComponents: .date)
             }
             
             if let error = errorMessage {
-                Text(error).foregroundColor(AppTheme.errorColor).font(.footnote)
+                Text(error)
+                    .foregroundColor(AppTheme.errorColor)
+                    .font(.footnote)
             }
         }
-        .navigationTitle("Registrar Préstamo")
+        .navigationTitle(isReceivable ? "Nuevo Préstamo" : "Adquirir Deuda")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button("Guardar") { saveDebt() }
+            ToolbarItem(placement: .navigationBarLeading) { Button("Cancelar") { dismiss() } }
+            ToolbarItem(placement: .navigationBarTrailing) { 
+                Button("Guardar") { save() }
                     .fontWeight(.bold)
+                    .disabled(!isFormValid)
             }
         }
-        .alert("Nueva Persona", isPresented: $showingCreatePerson) {
-            TextField("Nombre", text: $newPersonName)
-            Button("Cancelar", role: .cancel) { newPersonName = "" }
-            Button("Crear") { createPerson() }
-        }
     }
     
-    private func createPerson() {
-        let service = DebtService(modelContext: modelContext)
-        do {
-            try service.createPerson(name: newPersonName, phone: nil, email: nil, notes: nil)
-            newPersonName = ""
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-    
-    private func saveDebt() {
+    private func save() {
         let service = DebtService(modelContext: modelContext)
         let amount = Double(amountString.replacingOccurrences(of: ",", with: ".")) ?? 0.0
         
-        guard let person = selectedPerson, let account = selectedAccount else {
-            errorMessage = "Faltan datos (Persona o Cuenta)."
+        guard let account = selectedAccount else {
+            errorMessage = "Selecciona una cuenta válida."
             return
         }
         
         do {
-            if type == .receivable {
-                try service.recordLoanGiven(amount: amount, currency: account.currency, date: date, person: person, account: account, desc: desc.isEmpty ? nil : desc)
+            let personToUse: Person
+            if showNewPersonForm {
+                personToUse = try service.createPerson(name: newPersonName, phone: newPersonPhone.isEmpty ? nil : newPersonPhone)
             } else {
-                try service.recordLoanReceived(amount: amount, currency: account.currency, date: date, person: person, account: account, desc: desc.isEmpty ? nil : desc)
+                guard let selected = selectedPerson else {
+                    errorMessage = "Selecciona una persona."
+                    return
+                }
+                personToUse = selected
+            }
+            
+            if isReceivable {
+                try service.recordLoanGiven(to: personToUse, amount: amount, fromAccount: account, date: Date())
+            } else {
+                try service.recordLoanReceived(from: personToUse, amount: amount, toAccount: account, date: Date())
             }
             dismiss()
         } catch {
