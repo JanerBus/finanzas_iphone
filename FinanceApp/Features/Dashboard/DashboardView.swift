@@ -5,7 +5,6 @@ struct DashboardView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(filter: #Predicate<RecurringExpense> { $0.isActive }) private var allRecurring: [RecurringExpense]
     
-    // Gastos que ya cumplieron o se pasaron de su fecha
     var pendingRecurring: [RecurringExpense] {
         let now = Date()
         return allRecurring.filter { $0.nextOccurrence <= now }.sorted(by: { $0.nextOccurrence < $1.nextOccurrence })
@@ -51,6 +50,13 @@ struct DashboardView: View {
                             Image(systemName: "building.columns.fill")
                                 .foregroundColor(AppTheme.primaryColor)
                             Text("Mis Cuentas")
+                        }
+                    }
+                    NavigationLink(destination: CreditCardsListView()) {
+                        HStack {
+                            Image(systemName: "creditcard.fill")
+                                .foregroundColor(AppTheme.primaryColor)
+                            Text("Tarjetas de Crédito")
                         }
                     }
                 }
