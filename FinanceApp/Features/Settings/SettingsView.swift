@@ -17,9 +17,9 @@ struct SettingsView: View {
                 }
                 
                 Section(header: Text("Mantenimiento")) {
-                    Text("Copia de Seguridad y Restauración se implementarán en la Fase 11.")
-                        .font(.footnote)
-                        .foregroundColor(.secondary)
+                    NavigationLink(destination: BackupView()) {
+                        Label("Copia de Seguridad (Backup JSON)", systemImage: "externaldrive.fill")
+                    }
                 }
             }
             .navigationTitle("Configuración")
