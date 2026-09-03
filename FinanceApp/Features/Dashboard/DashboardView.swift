@@ -4,14 +4,11 @@ import SwiftData
 struct DashboardView: View {
     @Environment(\.modelContext) private var modelContext
     
-    // Consultas Reactivas. Si algo cambia en la app, esta vista se redibuja automáticamente.
     @Query(filter: #Predicate<Account> { $0.isActive }) private var accounts: [Account]
     @Query private var debts: [Debt]
     @Query(filter: #Predicate<CreditCard> { $0.isActive }) private var cards: [CreditCard]
     @Query private var transactions: [Transaction]
     @Query(filter: #Predicate<RecurringExpense> { $0.isActive }) private var allRecurring: [RecurringExpense]
-    
-    let balanceService = BalanceService()
     
     var pendingRecurring: [RecurringExpense] {
         let now = Date()
@@ -19,6 +16,9 @@ struct DashboardView: View {
     }
     
     var body: some View {
+        let balanceService = BalanceService(context: modelContext)
+        let primaryCurrency = balanceService.primaryCurrency
+        
         let available = balanceService.calculateAvailableBalance(accounts: accounts)
         let receivables = balanceService.calculateReceivables(debts: debts)
         let payables = balanceService.calculatePayables(debts: debts, cards: cards)
@@ -34,9 +34,11 @@ struct DashboardView: View {
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                         
-                        Text("\(net >= 0 ? "" : "-")\(abs(net), specifier: "%.2f")")
-                            .font(.system(size: 34, weight: .bold))
+                        Text("\(net >= 0 ? "" : "-")\(abs(net), specifier: "%.2f") \(primaryCurrency)")
+                            .font(.system(size: 30, weight: .bold))
                             .foregroundColor(net >= 0 ? .primary : AppTheme.errorColor)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.5)
                         
                         HStack(spacing: 15) {
                             BalanceMetricView(title: "Disponible", amount: available, color: AppTheme.primaryColor)
@@ -47,7 +49,7 @@ struct DashboardView: View {
                     .padding(.vertical, 8)
                 }
                 
-                Section(header: Text("Resumen del Mes")) {
+                Section(header: Text("Resumen del Mes (\(primaryCurrency))")) {
                     HStack {
                         VStack(alignment: .leading) {
                             Text("Ingresos").font(.caption).foregroundColor(.secondary)
@@ -104,24 +106,5 @@ struct DashboardView: View {
     private func record(_ expense: RecurringExpense) {
         let service = RecurringExpenseService(modelContext: modelContext)
         try? service.recordOccurrence(expense: expense)
-    }
-}
-
-struct BalanceMetricView: View {
-    let title: String
-    let amount: Double
-    let color: Color
-    
-    var body: some View {
-        VStack(spacing: 4) {
-            Text(title)
-                .font(.caption2)
-                .foregroundColor(.secondary)
-            Text("\(amount >= 0 ? "" : "-")\(abs(amount), specifier: "%.0f")")
-                .font(.callout)
-                .fontWeight(.bold)
-                .foregroundColor(color)
-        }
-        .frame(maxWidth: .infinity)
     }
 }

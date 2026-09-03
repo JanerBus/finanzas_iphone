@@ -11,7 +11,13 @@ struct SettingsView: View {
                 }
                 
                 Section(header: Text("Preferencias de App")) {
-                    Text("Configuraciones generales (Moneda principal, Tema) se implementarán en la fase de Pulido y Multimoneda.")
+                    NavigationLink(destination: CurrenciesView()) {
+                        Label("Monedas y Tasas de Cambio", systemImage: "dollarsign.arrow.circlepath")
+                    }
+                }
+                
+                Section(header: Text("Mantenimiento")) {
+                    Text("Copia de Seguridad y Restauración se implementarán en la Fase 11.")
                         .font(.footnote)
                         .foregroundColor(.secondary)
                 }
