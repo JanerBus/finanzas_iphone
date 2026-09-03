@@ -3,7 +3,6 @@ import SwiftData
 
 @main
 struct FinanceApp: App {
-    // Configuración central de SwiftData. Inyectará el ModelContext al resto de la aplicación.
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
             Account.self,
@@ -19,10 +18,9 @@ struct FinanceApp: App {
             Installment.self,
             UserSettings.self,
             Currency.self,
-            ExchangeRate.self
+            ExchangeRate.self,
+            RecurringExpense.self // Agregado en Fase 6
         ])
-        
-        // isStoredInMemoryOnly: false para que los datos persistan en el almacenamiento local.
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
         do {
@@ -36,7 +34,6 @@ struct FinanceApp: App {
         WindowGroup {
             MainTabView()
         }
-        // Inyección del contenedor a toda la jerarquía de vistas
         .modelContainer(sharedModelContainer)
     }
 }
