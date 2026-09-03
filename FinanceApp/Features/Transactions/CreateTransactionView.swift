@@ -6,6 +6,7 @@ struct CreateTransactionView: View {
     @Environment(\.dismiss) private var dismiss
     
     @Query(filter: #Predicate<Account> { $0.isActive }, sort: \Account.name) private var accounts: [Account]
+    @Query(sort: \Category.name) private var categories: [Category] // Fase 9: Categorías
     
     @State private var transactionType: TransactionType = .expense
     @State private var amountString: String = ""
@@ -13,9 +14,10 @@ struct CreateTransactionView: View {
     @State private var date: Date = Date()
     
     @State private var selectedAccount: Account?
-    @State private var destinationAccount: Account? // Solo usado si es Transferencia
+    @State private var destinationAccount: Account? 
+    @State private var selectedCategory: Category?
     
-    @State private var errorMessage: String? = nil
+    @State private var errorMessage: String?
     
     var body: some View {
         Form {
@@ -35,6 +37,16 @@ struct CreateTransactionView: View {
                 TextField("Descripción (Ej. Restaurante)", text: $desc)
                 
                 DatePicker("Fecha", selection: $date, displayedComponents: [.date, .hourAndMinute])
+                
+                // Las categorías solo aplican a ingresos o gastos
+                if transactionType != .transfer {
+                    Picker("Categoría", selection: $selectedCategory) {
+                        Text("Ninguna").tag(nil as Category?)
+                        ForEach(categories) { category in
+                            Text(category.name).tag(category as Category?)
+                        }
+                    }
+                }
             }
             
             Section(header: Text(transactionType == .transfer ? "Cuenta Origen" : "Cuenta")) {
@@ -82,9 +94,7 @@ struct CreateTransactionView: View {
             }
         }
         .onAppear {
-            if selectedAccount == nil {
-                selectedAccount = accounts.first
-            }
+            if selectedAccount == nil { selectedAccount = accounts.first }
         }
     }
     
@@ -100,9 +110,9 @@ struct CreateTransactionView: View {
         do {
             switch transactionType {
             case .expense:
-                try service.recordExpense(amount: amount, currency: account.currency, date: date, desc: desc, category: nil, account: account)
+                try service.recordExpense(amount: amount, currency: account.currency, date: date, desc: desc, category: selectedCategory, account: account)
             case .income:
-                try service.recordIncome(amount: amount, currency: account.currency, date: date, desc: desc, category: nil, account: account)
+                try service.recordIncome(amount: amount, currency: account.currency, date: date, desc: desc, category: selectedCategory, account: account)
             case .transfer:
                 guard let destAccount = destinationAccount else {
                     errorMessage = "Debes seleccionar una cuenta destino."
